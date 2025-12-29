@@ -42,104 +42,108 @@ export const GET = async (req: Request) => {
 
       const stream = new ReadableStream({
         async start(controller) {
-          await channel.history().on("ai.chunk", (chunk) => {
+          await channel.history().on("ai.chunk", (chunk: any) => {
             controller.enqueue(`data: ${JSON.stringify(chunk)}\n\n`)
             if (chunk.type === "finish") controller.close()
           })
         },
       })
 
-
-
-      //"X-Accel-Buffering": "no" // only ngrok
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
-        }
-      })
     }
+  })
+
+
+
+
+  //"X-Accel-Buffering": "no" // only ngrok
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    }
+  })
+}
 
 
 export const { POST } = serve(async (workflow) => {
 
-      // console.log('CURRENT WORKFLOW', workflow);
+  // console.log('CURRENT WORKFLOW', workflow);
 
-      const payload = workflow.requestPayload as any
-      const id = payload.id
-      // const message = payload.message as UIMessage
-      const lastMessage = payload.messages
-        ? payload.messages[payload.messages.length - 1]
-        : payload.message
+  const payload = workflow.requestPayload as any
+  const id = payload.id
+  // const message = payload.message as UIMessage
+  const lastMessage = payload.messages
+    ? payload.messages[payload.messages.length - 1]
+    : payload.message
 
-      let messageText = "";
-      if (lastMessage?.parts && Array.isArray(lastMessage.parts)) {
-        messageText = lastMessage.parts.find((p: any) => p.type === "text")?.text || "";
-      } else {
-        messageText = lastMessage?.content || "";
-      }
+  let messageText = "";
+  if (lastMessage?.parts && Array.isArray(lastMessage.parts)) {
+    messageText = lastMessage.parts.find((p: any) => p.type === "text")?.text || "";
+  } else {
+    messageText = lastMessage?.content || "";
+  }
 
 
-      const messageToSave = {
-        id: lastMessage?.id || crypto.randomUUID(),
-        role: lastMessage?.role || "user",
-        parts: [{ type: "text" as const, text: messageText }]
-      };
+  const messageToSave = {
+    id: lastMessage?.id || crypto.randomUUID(),
+    role: lastMessage?.role || "user",
+    parts: [{ type: "text" as const, text: messageText }]
+  };
 
-      if (!id || !messageText) {
-        console.error("Mensaje vacío o ID faltante");
-        throw new Error("Payload structure mismatch: messageText is empty");
-      }
-      // REPARACIÓN CRÍTICA: Convertir el objeto a STRING para Redis
-      // Redis no acepta objetos JSON directamente, solo strings o números.
-      await redis.zadd(
-        `history:${id}`,
-        { nx: true },
-        { score: Date.now(), member: JSON.stringify(messageToSave) }
-      )
+  if (!id || !messageText) {
+    console.error("Mensaje vacío o ID faltante");
+    throw new Error("Payload structure mismatch: messageText is empty");
+  }
+  // REPARACIÓN CRÍTICA: Convertir el objeto a STRING para Redis
+  // Redis no acepta objetos JSON directamente, solo strings o números.
+  await redis.zadd(
+    `history:${id}`,
+    { nx: true },
+    { score: Date.now(), member: JSON.stringify(messageToSave) }
+  )
 
-      await workflow.run("ai-generation", async () => {
-        // Obtenemos el historial y parseamos los strings de vuelta a objetos
-        const historyRaw = await redis.zrange<string[]>(`history:${id}`, 0, -1)
-        const history = historyRaw
-          .map(item => {
-            try {
-              // Solo intentamos parsear si parece un JSON (empieza con {)
-              return typeof item === 'string' && item.startsWith('{')
-                ? JSON.parse(item) as UIMessage
-                : null;
-            } catch (e) {
-              return null;
-            }
-          })
-          .filter((msg): msg is UIMessage => msg !== null); // Eliminamos los nulos
-
-        const result = streamText({
-          model: openrouter.chat("qwen/qwen3-coder:free"), // * Ajustado a modelo real  // deepseek/deepseek-r1-0528:free
-          system: "Use markdown and headings 1-3 to nicely format your response. Use a few emojis.",
-          messages: convertToModelMessages([...history, messageToSave]),
-        })
-
-        const stream = result.toUIMessageStream({
-          generateMessageId: () => crypto.randomUUID(),
-          onFinish: async ({ messages }) => {
-            // Guardar el resultado final de la IA en el historial
-            for (const msg of messages) {
-              if (msg.role === 'assistant') {
-                await redis.zadd(`history:${id}`, { score: Date.now(), member: JSON.stringify(msg) })
-              }
-            }
-          }
-        })
-
-        const channel = realtime.channel(id) // Usamos el ID del chat para emitir
-
-        for await (const chunk of stream) {
-          console.log(`>>> [BACKEND] Emitiendo chunk a canal ${id}:`, chunk.type);
-          await channel.emit("ai.chunk", chunk)
+  await workflow.run("ai-generation", async () => {
+    // Obtenemos el historial y parseamos los strings de vuelta a objetos
+    const historyRaw = await redis.zrange<string[]>(`history:${id}`, 0, -1)
+    const history = historyRaw
+      .map(item => {
+        try {
+          // Solo intentamos parsear si parece un JSON (empieza con {)
+          return typeof item === 'string' && item.startsWith('{')
+            ? JSON.parse(item) as UIMessage
+            : null;
+        } catch (e) {
+          return null;
         }
       })
-    }, {
-      baseUrl: process.env.UPSTASH_WORKFLOW_URL!
+      .filter((msg): msg is UIMessage => msg !== null); // Eliminamos los nulos
+
+    const result = streamText({
+      model: openrouter.chat("qwen/qwen3-coder:free"), // * Ajustado a modelo real  // deepseek/deepseek-r1-0528:free
+      system: "Use markdown and headings 1-3 to nicely format your response. Use a few emojis.",
+      messages: convertToModelMessages([...history, messageToSave]),
     })
+
+    const stream = result.toUIMessageStream({
+      generateMessageId: () => crypto.randomUUID(),
+      onFinish: async ({ messages }) => {
+        // Guardar el resultado final de la IA en el historial
+        for (const msg of messages) {
+          if (msg.role === 'assistant') {
+            await redis.zadd(`history:${id}`, { score: Date.now(), member: JSON.stringify(msg) })
+          }
+        }
+      }
+    })
+
+    const channel = realtime.channel(id) // Usamos el ID del chat para emitir
+
+    for await (const chunk of stream) {
+      console.log(`>>> [BACKEND] Emitiendo chunk a canal ${id}:`, chunk.type);
+      await channel.emit("ai.chunk", chunk)
+    }
+  })
+}, {
+  baseUrl: process.env.UPSTASH_WORKFLOW_URL!
+})
