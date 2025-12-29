@@ -80,13 +80,14 @@ export const Chat = ({ initialHistory }: { initialHistory: Record<string, UIMess
         )
       ))
 
-  const visibleMessages = useMemo(
-    () =>
-      messages.filter((message) =>
-        message.parts.some((part) => part.type === "text" && Boolean(part.text))
-      ),
-    [messages]
-  )
+  // const visibleMessages = useMemo(
+  //   () =>
+  //     messages.filter((message) =>
+  //       message.parts.some((part) => part.type === "text" && Boolean(part.text))
+  //     ),
+  //   [messages]
+  // )
+  const visibleMessages = messages;
 
   return (
     <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-neutral-900">

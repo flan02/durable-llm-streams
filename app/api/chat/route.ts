@@ -6,6 +6,8 @@ import { redis } from "@/lib/redis"
 import { serve } from "@upstash/workflow/nextjs"
 import { convertToModelMessages, streamText, UIMessage } from "ai"
 
+export const dynamic = 'force-dynamic';
+
 export const GET = async (req: Request) => {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get("id")
@@ -100,7 +102,7 @@ export const { POST } = serve(async (workflow) => {
       .filter((msg): msg is UIMessage => msg !== null); // Eliminamos los nulos
 
     const result = streamText({
-      model: openrouter.chat("deepseek/deepseek-r1-0528:free"), // * Ajustado a modelo real
+      model: openrouter.chat("qwen/qwen3-coder:free"), // * Ajustado a modelo real  // deepseek/deepseek-r1-0528:free
       system: "Use markdown and headings 1-3 to nicely format your response. Use a few emojis.",
       messages: convertToModelMessages([...history, messageToSave]),
     })
