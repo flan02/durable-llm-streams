@@ -18,7 +18,7 @@ export const GET = async (req: Request) => {
       console.log("--- [GET] Puente establecido. Escuchando ai.chunk...");
 
       // Usamos subscribe directamente (es lo que tus tipos permiten)
-      channel.subscribe(msg => {
+      (channel as any).subscribe((msg: any) => {
         if (msg.event === "ai.chunk") {
           console.log(`<<< [GET] Recibido: ${msg.data.type}`);
           controller.enqueue(`data: ${JSON.stringify(msg.data)}\n\n`);
@@ -30,34 +30,17 @@ export const GET = async (req: Request) => {
       });
     },
     cancel() {
-      channel.unsubscribe();
+      (channel as any).unsubscribe();
     }
   });
 
-  // console.log("--- [GET] Puente establecido. Escuchando ai.chunk...");
-  // const stream = new ReadableStream({
-  //   async start(controller) {
-  //     await channel.history().on("ai.chunk", (chunk: any) => {
-  //       console.log(`<<< [GET] Recibido de Realtime: ${chunk.type} - Contenido: ${chunk.text?.substring(0, 10)}...`);
-  //       controller.enqueue(`data: ${JSON.stringify(chunk)}\n\n`)
 
-  //       if (chunk.type === "finish") {
-  //         console.log("--- [GET] Stream cerrado por 'finish'");
-  //         controller.close()
-  //       }
-  //     })
-  //   },
-  //   cancel() {
-  //     channel.unsubscribe()
-  //   }
-  // })
-
+  //"X-Accel-Buffering": "no" // only ngrok
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
-      "X-Accel-Buffering": "no" // only ngrok
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
     }
   })
 }

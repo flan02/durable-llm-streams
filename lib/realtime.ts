@@ -1,6 +1,7 @@
 import { InferRealtimeEvents, Realtime } from "@upstash/realtime"
 import { UIMessageChunk } from "ai"
-import z from "zod/v4"
+// import z from "zod/v4"
+import z from "zod"
 import { redis } from "./redis"
 
 export const schema = {
