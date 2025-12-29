@@ -54,10 +54,9 @@ export const { POST } = serve(async (workflow) => {
     const { success, reset, limit, remaining } = await ratelimit.limit(id);
 
     if (!success) {
-      // Lanzar un error aquí detiene el workflow correctamente
-      //throw new Error(`Rate limit exceeded. Try again at ${new Date(reset).toISOString()}`);
+      // return new Response("Too many requests", { status: 429 });
       console.log('Too many requests');
-      return new Response("Too many requests", { status: 429 });
+      throw new Error(`Rate limit exceeded. Try again at ${new Date(reset).toISOString()}`);
     }
   });
 
