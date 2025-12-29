@@ -2,6 +2,7 @@
 
 import { openrouter } from "@/lib/openrouter"
 import { realtime } from "@/lib/realtime"
+import { Ratelimit } from "@upstash/ratelimit";
 import { redis } from "@/lib/redis"
 import { serve } from "@upstash/workflow/nextjs"
 import { convertToModelMessages, streamText, UIMessage } from "ai"
@@ -14,34 +15,6 @@ export const GET = async (req: Request) => {
   if (!id) return new Response('ID is required', { status: 400 })
 
   const channel = realtime.channel(id)
-
-  // const stream = new ReadableStream({
-  //   start(controller) {
-  //     console.log("--- [GET] Puente establecido. Escuchando ai.chunk...");
-
-  //     const preamble = `: ${" ".repeat(2048)}\n\n`;
-  //     controller.enqueue(new TextEncoder().encode(preamble));
-
-  //    // Usamos subscribe directamente (es lo que tus tipos permiten)
-  //         (channel as any).subscribe((msg: any) => {
-  //           if (msg.event === "ai.chunk") {
-  //             console.log(`<<< [GET] Recibido: ${msg.data.type}`);
-
-  //             controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(msg.data)}\n\n`));
-  //             // controller.enqueue(`data: ${JSON.stringify(msg.data)}\n\n`);
-
-  //             if (msg.data.type === "finish") {
-  //               controller.close();
-  //             }
-  //           }
-  //         });
-  //       },
-  //       cancel() {
-  //         (channel as any).unsubscribe();
-  //       }
-
-  //     })
-
   const stream = new ReadableStream({
     async start(controller) {
       await channel.history().on("ai.chunk", (chunk) => {
@@ -51,16 +24,23 @@ export const GET = async (req: Request) => {
     },
   })
 
-
+  // "Connection": "keep-alive"
   //"X-Accel-Buffering": "no" // only ngrok
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive"
     }
   })
 }
+
+
+const ratelimit = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(10, "1h"), // or fixedWindow
+  analytics: true,
+  prefix: "@upstash/ratelimit",
+});
 
 
 export const { POST } = serve(async (workflow) => {
@@ -68,6 +48,15 @@ export const { POST } = serve(async (workflow) => {
   const { id, message } = workflow.requestPayload as {
     id: string
     message: UIMessage
+  }
+
+  // ? Rate limiting per chat ID. Run it before doing any work.
+  const identifier = id
+  const { success, limit, reset, remaining } = await ratelimit.limit(identifier)
+
+  if (!success) {
+    // throw new Error(`Rate limit exceeded. Try again in ${new Date(reset).toLocaleTimeString()}`);
+    return new Response("Too many requests", { status: 429 });
   }
 
   await redis.zadd(`history:${id}`, { nx: true }, { score, member: message })
