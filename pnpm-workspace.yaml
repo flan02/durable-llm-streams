@@ -1,4 +1,5 @@
 onlyBuiltDependencies:
   - esbuild
+  - ngrok
   - sharp
   - unrs-resolver

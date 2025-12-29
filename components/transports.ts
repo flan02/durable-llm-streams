@@ -8,7 +8,7 @@ type ResumableTransportOptions = {
 }
 
 export const createResumableTransport = ({ messageId, setChatId, setMessageId }: ResumableTransportOptions) => {
-  new DefaultChatTransport({
+  return new DefaultChatTransport({
     async prepareSendMessagesRequest({ messages, id }) {
       await setChatId(id)
       return { body: { message: messages[messages.length - 1], id } }
@@ -31,11 +31,15 @@ export const createResumableTransport = ({ messageId, setChatId, setMessageId }:
         })
       }
 
-      const { id } = JSON.parse(init?.body as string).message
-      await setMessageId(id)
+      const body = JSON.parse(init?.body as string);
+      const chatId = body.id;
+      const currentMessageId = body.message.id;
+      await setMessageId(currentMessageId)
+      // const { id } = JSON.parse(init?.body as string).message
+      // await setMessageId(id)
 
       const [res] = await Promise.all([
-        fetch(input + `?id=${id}`, { method: "GET" }),
+        fetch(input + `?id=${chatId}`, { method: "GET", headers: { "Accept": "text/event-stream" } }),
         fetch(input, init)
       ])
 
