@@ -45,18 +45,32 @@ export const Chat = ({ initialHistory }: { initialHistory: Record<string, UIMess
   const [chatId, setChatId] = useQueryState("chatId", { defaultValue: "" })
   const inputRef = useRef<HTMLInputElement>(null)
 
+
+
   const history = initialHistory[chatId] ?? []
 
   useEffect(() => {
     if (!chatId) setChatId(crypto.randomUUID())
   }, [chatId])
 
+
+
   const { messages, sendMessage, status } = useChat({
     id: chatId ?? undefined,
     resume: Boolean(history.at(-1)?.id === messageId),
     messages: history,
     transport: createResumableTransport({ messageId, setChatId, setMessageId })!,
+    onFinish: async (msg) => {
+      console.log("📡 [DEBUG] ¡Respuesta recibida del servidor!", msg);
+    }
   })
+
+  // Monitoreo en tiempo real para v2.x
+  useEffect(() => {
+    if (status === 'streaming') {
+      console.log("✍️ [DEBUG] Recibiendo ráfaga de datos...", messages[messages.length - 1]);
+    }
+  }, [messages, status]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,14 +94,14 @@ export const Chat = ({ initialHistory }: { initialHistory: Record<string, UIMess
         )
       ))
 
-  // const visibleMessages = useMemo(
-  //   () =>
-  //     messages.filter((message) =>
-  //       message.parts.some((part) => part.type === "text" && Boolean(part.text))
-  //     ),
-  //   [messages]
-  // )
-  const visibleMessages = messages;
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter((message) =>
+        message.parts.some((part) => part.type === "text" && Boolean(part.text))
+      ),
+    [messages]
+  )
+  // const visibleMessages = messages;
 
   return (
     <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-neutral-900">

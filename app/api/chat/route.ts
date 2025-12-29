@@ -19,11 +19,16 @@ export const GET = async (req: Request) => {
     start(controller) {
       console.log("--- [GET] Puente establecido. Escuchando ai.chunk...");
 
+      const preamble = `: ${" ".repeat(2048)}\n\n`;
+      controller.enqueue(new TextEncoder().encode(preamble));
+
       // Usamos subscribe directamente (es lo que tus tipos permiten)
       (channel as any).subscribe((msg: any) => {
         if (msg.event === "ai.chunk") {
           console.log(`<<< [GET] Recibido: ${msg.data.type}`);
-          controller.enqueue(`data: ${JSON.stringify(msg.data)}\n\n`);
+
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(msg.data)}\n\n`));
+          // controller.enqueue(`data: ${JSON.stringify(msg.data)}\n\n`);
 
           if (msg.data.type === "finish") {
             controller.close();
