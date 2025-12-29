@@ -124,4 +124,6 @@ export const { POST } = serve(async (workflow) => {
       await channel.emit("ai.chunk", chunk)
     }
   })
+}, {
+  baseUrl: process.env.UPSTASH_WORKFLOW_URL!,
 })
