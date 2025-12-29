@@ -39,11 +39,7 @@ import { Suggestion, Suggestions } from "./ai-elements/suggestion"
 import { Icons } from "./icons"
 import { createRegularTransport, createResumableTransport } from "./transports"
 
-export const Chat = ({
-  initialHistory,
-}: {
-  initialHistory: Record<string, UIMessage[]>
-}) => {
+export const Chat = ({ initialHistory }: { initialHistory: Record<string, UIMessage[]> }) => {
   const [input, setInput] = useState("")
   const [messageId, setMessageId] = useQueryState("messageId")
   const [chatId, setChatId] = useQueryState("chatId", { defaultValue: "" })

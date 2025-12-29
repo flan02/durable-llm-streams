@@ -125,5 +125,5 @@ export const { POST } = serve(async (workflow) => {
     }
   })
 }, {
-  baseUrl: process.env.UPSTASH_WORKFLOW_URL!,
+  baseUrl: process.env.UPSTASH_WORKFLOW_URL!
 })

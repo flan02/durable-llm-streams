@@ -38,10 +38,22 @@ export const createResumableTransport = ({ messageId, setChatId, setMessageId }:
       // const { id } = JSON.parse(init?.body as string).message
       // await setMessageId(id)
 
-      const [res] = await Promise.all([
-        fetch(input + `?id=${chatId}`, { method: "GET", headers: { "Accept": "text/event-stream" } }),
-        fetch(input, init)
-      ])
+      // * With Promise.all
+      // const [res] = await Promise.all([
+      //   fetch(input + `?id=${chatId}`, { method: "GET", headers: { "Accept": "text/event-stream" } }),
+      //   fetch(input, init)
+      // ])
+
+      // * Without Promise.all
+      fetch(input, init).catch(err => console.error("Error en POST:", err))
+      const res = await fetch(input + `?id=${chatId}`, {
+        method: "GET",
+        headers: {
+          "Accept": "text/event-stream",
+          "Cache-Control": "no-cache"
+        }
+      });
+
 
       return res
     }
