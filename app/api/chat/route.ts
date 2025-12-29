@@ -44,22 +44,29 @@ const ratelimit = new Ratelimit({
 
 
 export const { POST } = serve(async (workflow) => {
-  const score = Date.now()
   const { id, message } = workflow.requestPayload as {
     id: string
     message: UIMessage
   }
 
   // ? Rate limiting per chat ID. Run it before doing any work.
-  const identifier = id
-  const { success, limit, reset, remaining } = await ratelimit.limit(identifier)
+  await workflow.run("check-rate-limit", async () => {
+    const { success, reset, limit, remaining } = await ratelimit.limit(id);
 
-  if (!success) {
-    // throw new Error(`Rate limit exceeded. Try again in ${new Date(reset).toLocaleTimeString()}`);
-    return new Response("Too many requests", { status: 429 });
-  }
+    if (!success) {
+      // Lanzar un error aquí detiene el workflow correctamente
+      //throw new Error(`Rate limit exceeded. Try again at ${new Date(reset).toISOString()}`);
+      console.log('Too many requests');
+      return new Response("Too many requests", { status: 429 });
+    }
+  });
 
-  await redis.zadd(`history:${id}`, { nx: true }, { score, member: message })
+  const score = Date.now()
+
+  // await redis.zadd(`history:${id}`, { nx: true }, { score, member: message })
+  await workflow.run("save-history", async () => {
+    await redis.zadd(`history:${id}`, { nx: true }, { score, member: message });
+  });
 
   await workflow.run("ai-generation", async () => {
     const history = await redis.zrange<UIMessage[]>(`history:${id}`, 0, -1)
