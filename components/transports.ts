@@ -25,6 +25,7 @@ export const createResumableTransport = ({ messageId, setChatId, setMessageId }:
       const headers = new Headers(init?.headers)
 
       if (headers.get("x-is-reconnect") === "true") {
+        console.log("🔍 [DEBUG] Reconnect detectado. Usando messageId:", messageId);
         return fetch(input + `?id=${messageId}`, {
           ...init,
           method: "GET",
@@ -34,6 +35,10 @@ export const createResumableTransport = ({ messageId, setChatId, setMessageId }:
       const body = JSON.parse(init?.body as string);
       const chatId = body.id;
       const currentMessageId = body.message.id;
+
+      console.log("🚀 [DEBUG] Nueva petición iniciada:");
+      console.log("   👉 ID del Canal (chatId):", chatId);
+      console.log("   👉 ID del Mensaje (currentMessageId):", currentMessageId);
       await setMessageId(currentMessageId)
       // const { id } = JSON.parse(init?.body as string).message
       // await setMessageId(id)
@@ -46,6 +51,9 @@ export const createResumableTransport = ({ messageId, setChatId, setMessageId }:
 
       // * Without Promise.all
       fetch(input, init).catch(err => console.error("Error en POST:", err))
+
+      const streamUrl = input + `?id=${chatId}`;
+      console.log("📡 [DEBUG] Abriendo EventStream en:", streamUrl);
 
       return fetch(input + `?id=${chatId}`, {
         method: "GET",
